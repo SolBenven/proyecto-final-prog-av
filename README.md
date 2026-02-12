@@ -63,7 +63,10 @@ El sistema utiliza un **clasificador provisto por la cátedra** (`data/claims_cl
 ## Ejecutar Tests
 
 ```bash
-python -m unittest discover tests -v
+# Ejecutar tests con reporte de cobertura
+coverage run -m unittest discover -v .\tests\
+# Ver cobertura
+coverage report -m --omit=tests\*
 ```
 
 ---
