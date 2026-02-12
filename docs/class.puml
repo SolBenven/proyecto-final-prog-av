@@ -1,0 +1,281 @@
+@startuml UML
+
+skinparam classAttributeIconSize 0
+
+' ── Enums ────────────────────────────────────────────────────
+enum Claustro {
+    ESTUDIANTE
+    DOCENTE
+    PAYS
+}
+
+enum RolAdmin {
+    JEFE_DEPARTAMENTO
+    SECRETARIO_TECNICO
+}
+
+enum EstadoReclamo {
+    INVALIDO
+    PENDIENTE
+    EN_PROCESO
+    RESUELTO
+}
+
+' ── Modelos: Herencia de Usuarios ────────────────────────────
+abstract class Usuario {
+    +id : int
+    +nombre : str
+    +apellido : str
+    +correo : str
+    +nombre_usuario : str
+    +hash_contrasena : str
+    +tipo_usuario : str
+    --
+    +establecer_contrasena(contrasena : str)
+    +verificar_contrasena(contrasena : str) : bool
+    +{abstract} nombre_completo : str <<get>>
+    +{static} obtener_por_nombre_usuario(nombre_usuario : str) : Usuario
+    +{static} obtener_por_correo(correo : str) : Usuario
+    +{static} obtener_por_id(usuario_id : int) : Usuario
+    +{static} correo_existe(correo : str) : bool
+    +{static} nombre_usuario_existe(nombre_usuario : str) : bool
+    +autenticar(nombre_usuario : str, contrasena : str) : Usuario
+    #_validar_y_persistir(usuario : Usuario, contrasena : str) : tuple
+}
+
+class UsuarioFinal {
+    +claustro : Claustro
+    +reclamos_creados : list[Reclamo]
+    +reclamos_adheridos : list[AdherenteReclamo]
+    --
+    +nombre_completo : str <<get>>
+    +{static} registrar(...) : tuple[UsuarioFinal, str]
+}
+
+class UsuarioAdmin {
+    +departamento_id : int
+    +rol_admin : RolAdmin
+    +departamento : Departamento
+    --
+    +es_jefe_departamento : bool <<get>>
+    +es_secretario_tecnico : bool <<get>>
+    +puede_acceder_reclamo(reclamo : Reclamo) : bool
+    +nombre_completo : str <<get>>
+    +{static} crear(...) : tuple[UsuarioAdmin, str]
+}
+
+' ── Modelo: Departamento ─────────────────────────────────────
+class Departamento {
+    +id : int
+    +nombre : str
+    +nombre_mostrar : str
+    +es_secretaria_tecnica : bool
+    +creado_en : datetime
+    +reclamos : list[Reclamo]
+    +usuarios_admin : list[UsuarioAdmin]
+    --
+    +{static} obtener_todos() : list[Departamento]
+    +{static} obtener_por_id(departamento_id : int) : Departamento
+    +{static} obtener_secretaria_tecnica() : Departamento
+    +{static} obtener_por_nombre(nombre : str) : Departamento
+    +{static} obtener_para_admin(usuario_admin : UsuarioAdmin) : list[Departamento]
+    +{static} obtener_ids_para_admin(usuario_admin : UsuarioAdmin) : list[int]
+    +{static} obtener_por_ids(departamento_ids : list[int]) : list[Departamento]
+}
+
+' ── Modelo: Reclamo ──────────────────────────────────────────
+class Reclamo {
+    +id : int
+    +detalle : str
+    +estado : EstadoReclamo
+    +ruta_imagen : str
+    +creado_en : datetime
+    +actualizado_en : datetime
+    +departamento_id : int
+    +creador_id : int
+    +departamento : Departamento
+    +creador : UsuarioFinal
+    +adherentes : list[AdherenteReclamo]
+    +historial_estados : list[HistorialEstadoReclamo]
+    +derivaciones : list[DerivacionReclamo]
+    --
+    +cantidad_adherentes : int <<get>>
+    +{static} crear(...) : tuple[Reclamo, str]
+    +{static} actualizar_estado(...) : tuple[bool, str]
+    +{static} obtener_por_id(reclamo_id : int) : Reclamo
+    +{static} obtener_pendientes(...) : list[Reclamo]
+    +{static} obtener_todos_con_filtros(...) : list[Reclamo]
+    +{static} obtener_conteo_estados(...) : dict
+    +{static} obtener_conteos_dashboard(...) : dict
+    +{static} obtener_conteos_dashboard_departamento(...) : dict
+    +{static} agregar_adherente(...) : tuple[bool, str]
+    +{static} quitar_adherente(...) : tuple[bool, str]
+    +{static} es_usuario_adherente(...) : bool
+    +{static} obtener_por_usuario(usuario_id : int) : list[Reclamo]
+    +{static} obtener_adheridos_por_usuario(usuario_id : int) : list[Reclamo]
+    +{static} obtener_por_departamentos(...) : list[Reclamo]
+    +{static} obtener_ids_adherentes(reclamo_id : int) : list[int]
+}
+
+' ── Modelo: AdherenteReclamo ─────────────────────────────────
+class AdherenteReclamo {
+    +id : int
+    +reclamo_id : int
+    +usuario_id : int
+    +creado_en : datetime
+    +reclamo : Reclamo
+    +usuario : UsuarioFinal
+}
+
+' ── Modelo: HistorialEstadoReclamo ───────────────────────────
+class HistorialEstadoReclamo {
+    +id : int
+    +reclamo_id : int
+    +estado_anterior : EstadoReclamo
+    +estado_nuevo : EstadoReclamo
+    +cambiado_por_id : int
+    +cambiado_en : datetime
+    +reclamo : Reclamo
+    +cambiado_por : UsuarioAdmin
+    +notificaciones_usuario : list[NotificacionUsuario]
+}
+
+' ── Modelo: DerivacionReclamo ────────────────────────────────
+class DerivacionReclamo {
+    +id : int
+    +reclamo_id : int
+    +departamento_origen_id : int
+    +departamento_destino_id : int
+    +derivado_por_id : int
+    +motivo : str
+    +derivado_en : datetime
+    +reclamo : Reclamo
+    +departamento_origen : Departamento
+    +departamento_destino : Departamento
+    +derivado_por : UsuarioAdmin
+    --
+    +{static} derivar(...) : tuple[DerivacionReclamo, str]
+    +{static} obtener_historial_reclamo(reclamo_id : int) : list[DerivacionReclamo]
+    +{static} obtener_departamentos_disponibles(...) : list[Departamento]
+    +{static} puede_derivar(usuario_admin) : bool
+}
+
+' ── Modelo: NotificacionUsuario ──────────────────────────────
+class NotificacionUsuario {
+    +id : int
+    +usuario_id : int
+    +historial_estado_reclamo_id : int
+    +leido_en : datetime
+    +creado_en : datetime
+    +usuario : Usuario
+    +historial_estado_reclamo : HistorialEstadoReclamo
+    --
+    +esta_leido : bool <<get>>
+    +marcar_como_leido()
+    +{static} obtener_pendientes_usuario(usuario_id : int) : list[NotificacionUsuario]
+    +{static} obtener_conteo_no_leidas(usuario_id : int) : int
+    +{static} marcar_notificacion_como_leida(...) : tuple[bool, str]
+    +{static} marcar_todas_como_leidas_usuario(usuario_id : int) : int
+}
+
+' ── Clases de Servicio / Infraestructura ─────────────────────
+class Clasificador {
+    +vectorizador : TfidfVectorizer
+    +clasificador : MultinomialNB
+    +esta_entrenado : bool
+    +ruta_modelo : str
+    +ruta_vectorizador : str
+    --
+    +entrenar(textos : list[str], etiquetas : list[str])
+    +clasificar(texto : str) : str
+    +obtener_confianza(texto : str) : float
+    +modelo_disponible() : bool
+    -_guardar_modelo()
+    -_cargar_modelo()
+}
+note bottom of Clasificador : Instancia global: clasificador
+
+class BuscadorSimilitud {
+    +vectorizador : TfidfVectorizer
+    --
+    +buscar_reclamos_similares(texto, ...) : list[tuple[Reclamo, float]]
+}
+note bottom of BuscadorSimilitud : Instancia global: buscador_similitud
+
+class GeneradorAnaliticas {
+    +{static} obtener_estadisticas_reclamos(...) : dict
+    +{static} obtener_frecuencias_palabras(...) : dict
+    +{static} generar_grafico_torta(conteos_estado : dict) : str
+    +{static} generar_nube_palabras(frecuencias : dict) : str
+    +{static} obtener_analiticas_completas(...) : dict
+}
+
+abstract class Reporte {
+    +departamento_ids : list[int]
+    +es_secretario_tecnico : bool
+    --
+    #_obtener_reclamos() : list[Reclamo]
+    #_obtener_departamentos() : list[Departamento]
+    #_obtener_estadisticas() : dict
+    +{abstract} generar() : str | bytes
+}
+
+class ReporteHTML {
+    +generar() : str
+}
+
+class ReportePDF {
+    +generar() : bytes
+}
+
+note bottom of Reporte
+    Factory function:
+    crear_reporte(formato, ...) -> Reporte
+end note
+
+class ManejadorImagen {
+    +{static} archivo_permitido(nombre_archivo : str) : bool
+    +{static} validar_imagen(archivo) : tuple[bool, str]
+    +{static} guardar_imagen_reclamo(archivo) : tuple[str, str]
+    +{static} eliminar_imagen_reclamo(ruta_imagen : str) : bool
+}
+
+class AyudanteAdmin {
+    +{static} obtener_reclamos_para_admin(usuario_admin, ...) : list[Reclamo]
+    +{static} obtener_reclamo_para_admin(usuario_admin, reclamo_id) : Reclamo
+    +{static} actualizar_estado_reclamo(usuario_admin, ...) : tuple[bool, str]
+}
+
+' ── Relaciones de Herencia ───────────────────────────────────
+Usuario <|-- UsuarioFinal
+Usuario <|-- UsuarioAdmin
+Reporte <|-- ReporteHTML
+Reporte <|-- ReportePDF
+
+' ── Relaciones con Enums ─────────────────────────────────────
+UsuarioFinal ..> Claustro
+UsuarioAdmin ..> RolAdmin
+Reclamo ..> EstadoReclamo
+
+' ── Relaciones entre Clases ──────────────────────────────────
+UsuarioAdmin "*" --> "0..1" Departamento : pertenece a
+Departamento "1" --> "*" Reclamo : tiene
+UsuarioFinal "1" --> "*" Reclamo : crea
+Reclamo "1" *--> "*" AdherenteReclamo : adherentes
+Reclamo "1" *--> "*" HistorialEstadoReclamo : historial
+Reclamo "1" *--> "*" DerivacionReclamo : derivaciones
+AdherenteReclamo "*" --> "1" UsuarioFinal : adherente
+HistorialEstadoReclamo "*" --> "1" UsuarioAdmin : cambiado por
+HistorialEstadoReclamo "1" --> "*" NotificacionUsuario : genera
+DerivacionReclamo "*" --> "1" Departamento : origen
+DerivacionReclamo "*" --> "1" Departamento : destino
+DerivacionReclamo "*" --> "1" UsuarioAdmin : derivado por
+NotificacionUsuario "*" --> "1" Usuario : notifica a
+
+' ── Dependencias ─────────────────────────────────────────────
+Reclamo ..> Clasificador : clasifica
+Reclamo ..> BuscadorSimilitud : busca similares
+AyudanteAdmin ..> Reclamo : gestiona
+GeneradorAnaliticas ..> Reclamo : genera estadísticas
+
+@enduml
